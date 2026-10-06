@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  MINUTE, DEFAULT_TASKS, configFrom, parseAction, parseTasks, parseTimer,
+  MINUTE, DEFAULT_TASKS, claimLock, configFrom, parseAction, parseLock, parseTasks, parseTimer,
   reduce, start, stateFile, type Config, type Timer,
 } from '../plugin/hooks/reducer.ts'
 
@@ -147,5 +147,41 @@ test('a stored timer is read back, and anything else is not', () => {
   assert.deepEqual(parseTimer(JSON.parse(JSON.stringify(timer))), timer)
   for (const value of [undefined, null, 3, {}, { ...timer, taskIndex: -1 }, { ...timer, dueAt: 'x' }]) {
     assert.equal(parseTimer(value), null)
+  }
+})
+
+const STALE = 6_000
+
+test('lock: a missing lock is taken', () => {
+  assert.deepEqual(claimLock(null, 'me', T0, STALE), { lock: { owner: 'me', heartbeat: T0 }, isHeld: true })
+})
+
+test('lock: our own lock is kept and its heartbeat renewed', () => {
+  const step = claimLock({ owner: 'me', heartbeat: T0 - 2_000 }, 'me', T0, STALE)
+  assert.deepEqual(step, { lock: { owner: 'me', heartbeat: T0 }, isHeld: true })
+})
+
+test('lock: another owner\'s fresh lock is left alone', () => {
+  const held = { owner: 'them', heartbeat: T0 - STALE }
+  const step = claimLock(held, 'me', T0, STALE)
+  assert.equal(step.isHeld, false)
+  assert.equal(step.lock, held)
+})
+
+test('lock: another owner\'s stale lock is taken over', () => {
+  const step = claimLock({ owner: 'them', heartbeat: T0 - STALE - 1 }, 'me', T0, STALE)
+  assert.deepEqual(step, { lock: { owner: 'me', heartbeat: T0 }, isHeld: true })
+})
+
+test('lock: a heartbeat far in the future is stale too', () => {
+  assert.equal(claimLock({ owner: 'them', heartbeat: T0 + STALE }, 'me', T0, STALE).isHeld, false)
+  assert.equal(claimLock({ owner: 'them', heartbeat: T0 + STALE + 1 }, 'me', T0, STALE).isHeld, true)
+})
+
+test('lock.json: only an owner and a numeric heartbeat are read', () => {
+  assert.deepEqual(parseLock('{"owner":"me","heartbeat":5}'), { owner: 'me', heartbeat: 5 })
+  for (const text of ['', 'not json', 'null', '{"owner":"me"}', '{"owner":"","heartbeat":5}',
+    '{"owner":3,"heartbeat":5}', '{"owner":"me","heartbeat":"5"}']) {
+    assert.equal(parseLock(text), null, text)
   }
 })

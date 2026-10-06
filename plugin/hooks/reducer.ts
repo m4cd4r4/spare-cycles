@@ -159,3 +159,39 @@ export function stateFile(timer: Timer, config: Config, owner: string, now: numb
     updatedAt: now,
   }
 }
+
+// lock.json: which process runs the timer, and when it last said it still does.
+export type Lock = { owner: string; heartbeat: number }
+
+export type Claim = {
+  // The lock as it should stand after this tick; write it when isHeld.
+  lock: Lock | null
+  // This process runs the timer this tick.
+  isHeld: boolean
+}
+
+// A lock.json's text, or null when it is not a well-formed lock.
+export function parseLock(text: string): Lock | null {
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (typeof value !== 'object' || value === null) return null
+  const { owner, heartbeat } = value as Record<string, unknown>
+  if (typeof owner !== 'string' || owner === '') return null
+  if (typeof heartbeat !== 'number' || !Number.isFinite(heartbeat)) return null
+  return { owner, heartbeat }
+}
+
+// Keep the lock if it is ours, take it if it is missing or stale, and leave it alone
+// if another process holds it. A heartbeat far in the future counts as stale too, so a
+// clock that jumped back cannot leave the lock held for ever.
+export function claimLock(held: Lock | null, owner: string, now: number, staleMs: number): Claim {
+  const isStale = held !== null && (now - held.heartbeat > staleMs || held.heartbeat - now > staleMs)
+  if (held === null || held.owner === owner || isStale) {
+    return { lock: { owner, heartbeat: now }, isHeld: true }
+  }
+  return { lock: held, isHeld: false }
+}

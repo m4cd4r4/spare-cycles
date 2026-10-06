@@ -1,13 +1,16 @@
-// The mod: wiring and file I/O. The timer's logic is in reducer.ts; this file reads the
-// clock, the store and the files, feeds them through it and writes back what changed.
+// The mod: wiring, file I/O and the lock. The timer's logic is in reducer.ts; this file
+// reads the clock, the store and the files, feeds them through it and writes back what
+// changed.
 
 import type { EngineInterface, Register } from 'claude-code'
 import {
-  configFrom, parseAction, parseTimer, reduce, start, stateFile, taskAt,
-  type Action, type Config, type Timer,
+  claimLock, configFrom, parseAction, parseLock, parseTimer, reduce, start, stateFile, taskAt,
+  type Action, type Config, type Lock, type Timer,
 } from './reducer.ts'
 
 const TICK_MS = 2_000
+// A lock not renewed for three ticks is taken over.
+const STALE_MS = 3 * TICK_MS
 const TIMER_KEY = 'timer'
 
 // What one run of the timer needs between ticks. Module variables start over on a
@@ -17,7 +20,9 @@ type Run = {
   owner: string
   statePath: string
   actionPath: string
-  isFirst: boolean
+  lockPath: string
+  // This process held the lock on its last tick.
+  isHolding: boolean
   isTicking: boolean
 }
 
@@ -44,9 +49,26 @@ async function readAction($: EngineInterface, path: string): Promise<Action | nu
   return typeof text === 'string' ? parseAction(text) : null
 }
 
+async function readLock($: EngineInterface, path: string): Promise<Lock | null> {
+  if (!(await $.fs.exists(path))) return null
+  const text = await $.fs.read(path).catch(() => null)
+  return typeof text === 'string' ? parseLock(text) : null
+}
+
 async function tick($: EngineInterface, run: Run): Promise<void> {
   const { config } = run
   const now = await $.clock.now()
+
+  // Only the lock's holder runs the timer; the others check again next tick.
+  const claim = claimLock(await readLock($, run.lockPath), run.owner, now, STALE_MS)
+  if (!claim.isHeld) {
+    run.isHolding = false
+    return
+  }
+  await $.fs.write(run.lockPath, `${JSON.stringify(claim.lock)}\n`)
+  const isTakingOver = !run.isHolding
+  run.isHolding = true
+
   const stored = parseTimer(await $.store.get(TIMER_KEY))
   let timer: Timer = stored ?? start(config, now)
   let isChanged = stored === null
@@ -62,11 +84,10 @@ async function tick($: EngineInterface, run: Run): Promise<void> {
   isChanged ||= step.isChanged
 
   if (isChanged) await $.store.set(TIMER_KEY, timer)
-  if (isChanged || run.isFirst) {
+  if (isChanged || isTakingOver) {
     const state = stateFile(timer, config, run.owner, now)
     await $.fs.write(run.statePath, `${JSON.stringify(state, null, 2)}\n`)
   }
-  run.isFirst = false
   if (step.isComingDue) $.ui.toast(`Spare cycles: ${taskAt(config, timer.taskIndex)}`)
 }
 
@@ -94,7 +115,8 @@ async function begin($: EngineInterface, config: Config): Promise<void> {
     owner: await ownerId($),
     statePath: `${dir}/state.json`,
     actionPath: `${dir}/action.json`,
-    isFirst: true,
+    lockPath: `${dir}/lock.json`,
+    isHolding: false,
     isTicking: false,
   }
   await guardedTick($, run)
