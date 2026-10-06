@@ -1,0 +1,6 @@
+{
+  "name": "spare-cycles",
+  "owner": { "name": "Macdara Ó Murchú" },
+  "description": "A timer that brings up a small task to do while Claude works.",
+  "plugins": [{ "name": "spare-cycles", "source": "./plugin" }]
+}

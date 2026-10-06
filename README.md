@@ -4,8 +4,8 @@ A Claude Code mod that reminds you to do a short task you choose (10 push-ups, w
 dishes, stretch) on a timer. The aim is to take the break while Claude is working, not
 while you are.
 
-**Status: not built yet.** It is being built in the open, one slice at a time. Each
-slice starts from a brief in [docs/briefs/](docs/briefs/).
+**Status: the core timer (slice 1a) is in; no UI yet.** It is being built in the open,
+one slice at a time. Each slice starts from a brief in [docs/briefs/](docs/briefs/).
 
 ## How it works
 
@@ -20,14 +20,21 @@ comes later.
 
 ## Install
 
-Not yet. Once slice 1 lands:
-
 ```
 claude plugin marketplace add m4cd4r4/spare-cycles
-claude plugin install spare-cycles@spare-cycles --config interval=45 --config snooze=5
+claude plugin install spare-cycles@spare-cycles
 ```
 
-`interval` and `snooze` are in minutes.
+The install screen asks for the options; change them later in `/config`.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `interval` | 45 | Minutes from Done or Skip to the next task coming due |
+| `snooze` | 5 | Minutes a Snooze pushes the current task back |
+| `tasks` | `10 push-ups, Wash the dishes, Stretch for 2 minutes` | Comma-separated, used in order and wrapping round |
+
+There is no UI yet, so for now the mod only keeps `~/.spare-cycles/state.json` up to
+date.
 
 ## Licence
 
