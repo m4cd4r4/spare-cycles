@@ -1,0 +1,10 @@
+{
+  "name": "spare-cycles",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22.6" },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\""
+  }
+}
