@@ -1,0 +1,6 @@
+{
+  "name": "spare-cycles",
+  "version": "0.1.0",
+  "description": "A timer that brings up a small task to do while Claude works.",
+  "license": "MIT"
+}
