@@ -69,7 +69,7 @@ task earlier when Claude is working on its own. Those are later slices.
 
 ## How to check it
 
-1. `node --test test/` passes. The reducer tests cover Done, Skip, Snooze, coming due,
+1. `npm test` passes (`node --test test/` fails on Node 21+, so the script passes a glob). The reducer tests cover Done, Skip, Snooze, coming due,
    wrapping round the task list, and an action whose `at` is not newer than the last.
 2. Run the mod with `claude --plugin-dir ./plugin`. `~/.spare-cycles/state.json` appears.
    Write an `action.json` by hand with `"action": "done"` and a current `at`, and
