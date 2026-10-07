@@ -39,6 +39,8 @@ The install screen asks for the options; change them later in `/config`.
 | `snooze` | 5 | Minutes a Snooze pushes the current task back |
 | `tasks` | `10 push-ups, Wash the dishes, Stretch for 2 minutes` | Comma-separated, used in order and wrapping round |
 
+The recorded build sessions run with `interval=2` and `snooze=1`, so a reminder comes due on camera. Day to day, keep the defaults or set your own.
+
 ### Setting your tasks
 
 Give the list at install, or change it later in `/config`:
